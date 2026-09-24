@@ -178,6 +178,8 @@ var wkof = null;
             window.wkPitchInfoScriptObjectsToRemove.push(divOuter);
 
             injectPitchInfoToSingleElement(wkItemInfo.currentState, divReading);
+            // No pitch data for this reading (e.g. a 〜 prefix/suffix entry): don't leave an empty white box behind
+            if (!divOuter.querySelector('.pitch-diagram')) divOuter.remove();
           };
         }
       })
