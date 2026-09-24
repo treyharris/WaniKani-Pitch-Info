@@ -453,15 +453,12 @@
       .pitch-diagram.pitch-diagram.pitch-diagram.pitch-diagram                                { margin: 0; display: block; font-size: 18px; }
       .pitch-pattern + .subject-readings-with-audio__audio-items                              { margin-top: 0.6em; }
       .character-header .question-pitch-display > span                                        { color: rgb(255 255 255); }
-      .character-header .additional-content__content:has(> .pitch-diagram) { background-color: rgba(0.2, 0.2, 0.2, 0.2); border-style: none; padding: 6px 8px; box-shadow: rgb(227, 227, 227) 0px 2px 4px !important; text-shadow: 0 2px black; }
-      ${Object.values(patternObj).map(({color, cssClass}) => `.$ {
-      cssClass
-    } {
-      color: $ {
-        color
-      };
-    }
-    `).join('')}`;
+      .character-header .additional-content__content:has(> .pitch-diagram) { background-color: rgba(0.2, 0.2, 0.2, 0.2); border-style: none; padding: 6px 8px; box-shadow: rgb(227, 227, 227) 0px 2px 4px !important; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); }
+      .character-header .additional-content__content:has(> .pitch-diagram) .pitch-pattern     { color: rgba(255, 255, 255, 0.8); }
+      .character-header .additional-content__content:has(> .pitch-diagram) .pitch-pattern h3  { font-size: 12px; }
+      .character-header .additional-content__content:has(> .pitch-diagram) .pitch-pattern p   { color: #fff; font-size: 15px; font-weight: 600; }
+      .character-header .additional-content__content:has(> .pitch-diagram) .pitch-pattern p a { color: #fff; text-decoration: underline; }
+      ${Object.values(patternObj).map(({color, cssClass}) => `.character-header .additional-content__content:has(> .pitch-diagram) .pitch-pattern p .${cssClass} { color: ${color}; }`).join('\n      ')}`;
     document.head.appendChild(style);
   }
 })();
