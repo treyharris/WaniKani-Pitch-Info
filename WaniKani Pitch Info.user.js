@@ -1,28 +1,32 @@
 // ==UserScript==
-// @name         WaniKani Pitch Info
+// @name         WaniKani Pitch Info (Userscripts patch)
 // @match        https://www.wanikani.com/*
 // @match        https://preview.wanikani.com/*
 // @namespace    https://greasyfork.org/en/scripts/31070-wanikani-pitch-info
-// @version      0.84
-// @description  Displays pitch accent diagrams on WaniKani vocab and session pages.
+// @version      0.84.1
+// @description  Displays pitch accent diagrams on WaniKani vocab and session pages. Patched for the Userscripts extension for Safari (no @resource / GM_* / unsafeWindow).
 // @author       Invertex
 // @supportURL   http://invertex.xyz
 // @run-at       document-idle
+// @inject-into  page
 // @require      https://greasyfork.org/scripts/430565-wanikani-item-info-injector/code/WaniKani%20Item%20Info%20Injector.user.js?version=1673042
-// @resource     accents https://raw.githubusercontent.com/mifunetoshiro/kanjium/94473cd69598abf54cc338a0b89f190a6c02a01c/data/source_files/raw/accents.txt
-// @grant        GM_getResourceText
-// @grant        unsafeWindow
-// @downloadURL https://update.greasyfork.org/scripts/31070/WaniKani%20Pitch%20Info.user.js
-// @updateURL https://update.greasyfork.org/scripts/31070/WaniKani%20Pitch%20Info.meta.js
+// @grant        none
+// @downloadURL  https://raw.githubusercontent.com/treyharris/WaniKani-Pitch-Info/userscripts-safari/WaniKani%20Pitch%20Info.user.js
+// @updateURL    https://raw.githubusercontent.com/treyharris/WaniKani-Pitch-Info/userscripts-safari/WaniKani%20Pitch%20Info.user.js
 // ==/UserScript==
-
-var wkof = null;
 
 (function() {
   'use strict';
   /* global wkItemInfo */
   /* eslint no-multi-spaces: off */
-  wkof = unsafeWindow.wkof;
+  // Running in the page context, so the page's own window is visible directly.
+  // (Declared inside the IIFE so it can't overwrite the real window.wkof global.)
+  let wkof = window.wkof || null;
+
+  // Formerly an @resource; fetched and cached instead, since Userscripts has no GM_getResourceText.
+  const ACCENTS_URL = 'https://raw.githubusercontent.com/mifunetoshiro/kanjium/94473cd69598abf54cc338a0b89f190a6c02a01c/data/source_files/raw/accents.txt';
+  const ACCENTS_CACHE = 'wk-pitch-info';
+  let accentsPromise = null;
 
   const SHOW_PITCH_DESCRIPTION = true;
   const SQUASH_DIGRAPHS = false;
@@ -198,10 +202,12 @@ var wkof = null;
   }
 
   function startup() {
-    wkItemInfo.forType('vocabulary').under('reading').notifyWhenVisible(injectPitchInfo);
-    wkItemInfo.forType('kanaVocabulary').under('meaning').notifyWhenVisible(injectPitchInfo);
     addCss();
-    loadWhileIdle();
+    // Data now arrives asynchronously, so load it before registering the injectors.
+    return loadPitchInfo().then(() => {
+      wkItemInfo.forType('vocabulary').under('reading').notifyWhenVisible(injectPitchInfo);
+      wkItemInfo.forType('kanaVocabulary').under('meaning').notifyWhenVisible(injectPitchInfo);
+    }).catch(e => console.error('WaniKani Pitch Info: could not load pitch data.', e));
   }
 
   function injectPitchInfoToSingleElement(injectorState, pReading) {
@@ -257,17 +263,38 @@ var wkof = null;
     return dInfo;
   }
 
-  function loadWhileIdle() {
-    // for some reason, requestIdleCallback executes loadPitchInfo() while the page is still loading => artificially delay it with setTimeout
-    window.setTimeout(() => {
-      if (window.requestIdleCallback) window.requestIdleCallback(loadPitchInfo);
-      else loadPitchInfo();
-    }, 4000);
+  function fetchAccents() {
+    // The URL is pinned to a commit, so a cached copy never goes stale.
+    if (!accentsPromise) {
+      accentsPromise = (async () => {
+        let cache = null;
+        try {
+          if (window.caches) {
+            cache = await caches.open(ACCENTS_CACHE);
+            const cached = await cache.match(ACCENTS_URL);
+            if (cached) return await cached.text();
+          }
+        } catch (e) {
+          console.debug('WaniKani Pitch Info: cache unavailable', e);
+          cache = null;
+        }
+        const response = await fetch(ACCENTS_URL);
+        if (!response.ok) throw new Error(`HTTP ${response.status} fetching accents.txt`);
+        if (cache) {
+          try { await cache.put(ACCENTS_URL, response.clone()); }
+          catch (e) { console.debug('WaniKani Pitch Info: could not cache accents.txt', e); }
+        }
+        return await response.text();
+      })();
+      accentsPromise.catch(() => { accentsPromise = null; }); // allow a retry on the next page load
+    }
+    return accentsPromise;
   }
 
-  function loadPitchInfo() {
+  async function loadPitchInfo() {
     if (pitchLookup) return;
-    let accents = GM_getResourceText('accents');
+    let accents = await fetchAccents();
+    if (pitchLookup) return;
     if (!PRE_PARSE || wkItemInfo.currentState.on === 'itemPage') {
       pitchLookup = (vocab, reading) => pitchLookupTextfile(vocab, reading, accents);
       return;
@@ -295,7 +322,7 @@ var wkof = null;
   }
 
   function getPitchInfo(vocab, reading) {
-    loadPitchInfo();
+    if (!pitchLookup) return null; // data not loaded (yet)
     let result = pitchLookup(vocab, reading);
     if (!result) result = pitchLookup(vocab.replace(/する$/, ''), reading.replace(/する$/, ''));
     if (!result) result = pitchLookup(toHiragana(vocab), toHiragana(reading));
