@@ -3,7 +3,7 @@
 // @match        https://www.wanikani.com/*
 // @match        https://preview.wanikani.com/*
 // @namespace    https://greasyfork.org/en/scripts/31070-wanikani-pitch-info
-// @version      0.84.1
+// @version      0.84.2
 // @description  Displays pitch accent diagrams on WaniKani vocab and session pages. Patched for the Userscripts extension for Safari (no @resource / GM_* / unsafeWindow).
 // @author       Invertex
 // @supportURL   http://invertex.xyz
