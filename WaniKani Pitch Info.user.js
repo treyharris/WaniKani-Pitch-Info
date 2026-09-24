@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         WaniKani Pitch Info (Userscripts patch)
+// @name         WaniKani Pitch Info
 // @match        https://www.wanikani.com/*
 // @match        https://preview.wanikani.com/*
 // @namespace    https://greasyfork.org/en/scripts/31070-wanikani-pitch-info
