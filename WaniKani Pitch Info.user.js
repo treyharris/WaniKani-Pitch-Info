@@ -161,29 +161,40 @@
 
 
           // Build one box per distinct reading; a reading with several pitch patterns stays in one box.
-          const boxes = [];
-          for (const reading of new Set(wkItemInfo.currentState.reading)) {
-            console.debug(`reading: ${reading}`);
+          // Spellings that differ only in hiragana vs. katakana count as the same reading.
+          const groups = new Map();
+          for (const reading of wkItemInfo.currentState.reading) {
             if (!reading) continue;
+            const key = toHiragana(reading);
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(reading);
+          }
+          const boxes = [];
+          for (const [key, variants] of groups) {
+            // Prefer the spelling the user typed; fall back to other spellings if it has no pitch data
+            variants.sort((a, b) => (b === userAnswer) - (a === userAnswer));
+            for (const reading of variants) {
+              console.debug(`reading: ${reading}`);
+              var divOuter = document.createElement('div');
+              divOuter.setAttribute('class', 'additional-content__content additional-content__content--open subject-section subject-section--reading subject-section--collapsible subject-section__subsection subject-readings-with-audio subject-readings-with-audio__item');
 
-            var divOuter = document.createElement('div');
-            divOuter.setAttribute('class', 'additional-content__content additional-content__content--open subject-section subject-section--reading subject-section--collapsible subject-section__subsection subject-readings-with-audio subject-readings-with-audio__item');
+              var divReading = document.createElement('div');
+              divReading.setAttribute('class', 'reading-with-audio__reading question-pitch-display');
+              divReading.setAttribute('lang', 'ja');
+              divReading.innerHTML = `${reading}`;
+              divOuter.appendChild(divReading);
 
-            var divReading = document.createElement('div');
-            divReading.setAttribute('class', 'reading-with-audio__reading question-pitch-display');
-            divReading.setAttribute('lang', 'ja');
-            divReading.innerHTML = `${reading}`;
-            divOuter.appendChild(divReading);
-
-            injectPitchInfoToSingleElement(wkItemInfo.currentState, divReading);
-            // No pitch data for this reading (e.g. a 〜 prefix/suffix entry): don't show an empty white box
-            if (!divOuter.querySelector('.pitch-diagram')) continue;
-            boxes.push({ reading, divOuter });
+              injectPitchInfoToSingleElement(wkItemInfo.currentState, divReading);
+              // No pitch data for this reading (e.g. a 〜 prefix/suffix entry): don't show an empty white box
+              if (!divOuter.querySelector('.pitch-diagram')) continue;
+              boxes.push({ key, divOuter });
+              break;
+            }
           }
 
           // Show the box for the reading the user answered; keep the others hidden behind a link,
           // so they don't give away a reading the user may want to try recalling.
-          const answered = boxes.find(b => b.reading === userAnswer);
+          const answered = boxes.find(b => b.key === toHiragana(userAnswer));
           const others = boxes.filter(b => b !== answered);
           others.forEach(b => b.divOuter.hidden = true);
 
@@ -359,9 +370,28 @@
     if (!pitchLookup) return null; // data not loaded (yet)
     let result = pitchLookup(vocab, reading);
     if (!result) result = pitchLookup(vocab.replace(/する$/, ''), reading.replace(/する$/, ''));
+    // Mixed kanji/katakana words (消しゴム): WaniKani's primary reading is all hiragana (けしごむ),
+    // but the accent data keeps the katakana (けしゴム)
+    if (!result) {
+      const mixed = carryKatakana(vocab, reading);
+      if (mixed && mixed !== reading) result = pitchLookup(vocab, mixed);
+    }
     if (!result) result = pitchLookup(toHiragana(vocab), toHiragana(reading));
     if (!result) result = pitchLookup(toKatakana(vocab), toKatakana(reading));
     return result;
+  }
+
+  // Rewrite each katakana run of the word into the reading, in order: (消しゴム, けしごむ) → けしゴム
+  function carryKatakana(vocab, reading) {
+    let out = reading, pos = 0;
+    for (const run of vocab.match(/[\u30A1-\u30FA\u30FC]+/g) || []) {
+      const h = toHiragana(run);
+      const i = out.indexOf(h, pos);
+      if (i < 0) return null;
+      out = out.slice(0, i) + run + out.slice(i + h.length);
+      pos = i + run.length;
+    }
+    return out;
   }
 
   function toHiragana(kana) {
