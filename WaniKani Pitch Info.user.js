@@ -3,7 +3,7 @@
 // @match        https://www.wanikani.com/*
 // @match        https://preview.wanikani.com/*
 // @namespace    https://greasyfork.org/en/scripts/31070-wanikani-pitch-info
-// @version      0.84.2
+// @version      0.84.3-alpha
 // @description  Displays pitch accent diagrams on WaniKani vocab and session pages. Patched for the Userscripts extension for Safari (no @resource / GM_* / unsafeWindow).
 // @author       Invertex
 // @supportURL   http://invertex.xyz
@@ -133,6 +133,9 @@
       // didAnswerQuestion will be triggered whenever the user answers a question
       window.addEventListener('didAnswerQuestion', () => {
         console.debug('didAnswerQuestion');
+        // Remove any boxes from an earlier answer to this same question. Double-Check fires
+        // didAnswerQuestion again on resubmit and on Mark Right/Wrong, so boxes would otherwise pile up.
+        clearQuestionPitch();
 
         // Only display pitch next to the question if the user enables it in the settings.
         if (wkof.settings.wanikani_pitch_info?.display_pitch_beside_question) {
@@ -156,50 +159,79 @@
             return;
           }
 
-          // Check if pitch info has already been added to avoid duplicates
-          if (divQuestion.querySelector('.question-pitch-display')) {
-            console.debug('Pitch info already added. Ignoring.');
-            return;
-          }
 
-          // For each reading, add the pitch into the area next to the question
-          for (const reading of wkItemInfo.currentState.reading) {
+          // Build one box per distinct reading; a reading with several pitch patterns stays in one box.
+          const boxes = [];
+          for (const reading of new Set(wkItemInfo.currentState.reading)) {
             console.debug(`reading: ${reading}`);
             if (!reading) continue;
 
-            // Create a white box in the question area
             var divOuter = document.createElement('div');
             divOuter.setAttribute('class', 'additional-content__content additional-content__content--open subject-section subject-section--reading subject-section--collapsible subject-section__subsection subject-readings-with-audio subject-readings-with-audio__item');
 
-            // Create a div to store the reading
             var divReading = document.createElement('div');
             divReading.setAttribute('class', 'reading-with-audio__reading question-pitch-display');
             divReading.setAttribute('lang', 'ja');
             divReading.innerHTML = `${reading}`;
             divOuter.appendChild(divReading);
 
-            divQuestion.insertAdjacentElement('afterend', divOuter);
-            window.wkPitchInfoScriptObjectsToRemove.push(divOuter);
-
             injectPitchInfoToSingleElement(wkItemInfo.currentState, divReading);
-            // No pitch data for this reading (e.g. a 〜 prefix/suffix entry): don't leave an empty white box behind
-            if (!divOuter.querySelector('.pitch-diagram')) divOuter.remove();
+            // No pitch data for this reading (e.g. a 〜 prefix/suffix entry): don't show an empty white box
+            if (!divOuter.querySelector('.pitch-diagram')) continue;
+            boxes.push({ reading, divOuter });
+          }
+
+          // Show the box for the reading the user answered; keep the others hidden behind a link,
+          // so they don't give away a reading the user may want to try recalling.
+          const answered = boxes.find(b => b.reading === userAnswer);
+          const others = boxes.filter(b => b !== answered);
+          others.forEach(b => b.divOuter.hidden = true);
+
+          let anchor = divQuestion;
+          const place = el => {
+            anchor.insertAdjacentElement('afterend', el);
+            window.wkPitchInfoScriptObjectsToRemove.push(el);
+            anchor = el;
           };
+
+          let linkHome = answered?.divOuter;
+          if (!linkHome && others.length > 0) {
+            // The answered reading has no pitch data, but others do: show just the link
+            linkHome = document.createElement('div');
+            linkHome.classList.add('pitch-more-readings-solo');
+            place(linkHome);
+          }
+          if (answered) place(answered.divOuter);
+          others.forEach(b => place(b.divOuter));
+
+          if (others.length > 0) {
+            const n = others.length;
+            const link = document.createElement('a');
+            link.href = '#';
+            link.setAttribute('role', 'button');
+            link.classList.add('pitch-more-readings');
+            link.textContent = `+${n} more reading${n === 1 ? '' : 's'}…`;
+            link.addEventListener('click', e => {
+              e.preventDefault();
+              e.stopPropagation();
+              others.forEach(b => b.divOuter.hidden = false);
+              link.remove();
+              if (linkHome.classList.contains('pitch-more-readings-solo')) linkHome.remove();
+            });
+            linkHome.appendChild(link);
+          }
         }
       })
 
       // Cleans up the objects that we inject into the question area
-      window.addEventListener('willShowNextQuestion', () => {
-        // willShowNextQuestion will be triggered whenever a new question is to be loaded
-        // Register a callback here to clean up the pitches that we insert into the question area.
-        window.wkPitchInfoScriptObjectsToRemove.forEach(pObject => {
-          while (pObject.firstChild) {
-            pObject.removeChild(pObject.firstChild);
-          }
-          pObject.remove();
-        });
+      function clearQuestionPitch() {
+        window.wkPitchInfoScriptObjectsToRemove.forEach(pObject => pObject.remove());
         window.wkPitchInfoScriptObjectsToRemove = [];
-      })
+      }
+      // willShowNextQuestion: a new question is about to load.
+      // didUnanswerQuestion: fired by the Double-Check userscript when an answer is reset for retyping.
+      window.addEventListener('willShowNextQuestion', clearQuestionPitch);
+      window.addEventListener('didUnanswerQuestion', clearQuestionPitch);
     }
   }
 
@@ -458,6 +490,8 @@
       .character-header .additional-content__content:has(> .pitch-diagram) .pitch-pattern h3  { font-size: 12px; }
       .character-header .additional-content__content:has(> .pitch-diagram) .pitch-pattern p   { color: #fff; font-size: 15px; font-weight: 600; }
       .character-header .additional-content__content:has(> .pitch-diagram) .pitch-pattern p a { color: #fff; text-decoration: underline; }
+      .character-header .pitch-more-readings { display: block; margin-top: 4px; color: #fff; font-size: 13px; font-weight: 600; text-decoration: underline; cursor: pointer; }
+      .character-header .pitch-more-readings-solo { align-self: center; padding: 6px 8px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); }
       ${Object.values(patternObj).map(({color, cssClass}) => `.character-header .additional-content__content:has(> .pitch-diagram) .pitch-pattern p .${cssClass} { color: ${color}; }`).join('\n      ')}`;
     document.head.appendChild(style);
   }
