@@ -9,7 +9,7 @@
 // @supportURL   http://invertex.xyz
 // @run-at       document-idle
 // @inject-into  page
-// @require      https://greasyfork.org/scripts/430565-wanikani-item-info-injector/code/WaniKani%20Item%20Info%20Injector.user.js?version=1673042
+// @require      https://greasyfork.org/scripts/430565-wanikani-item-info-injector/code/WaniKani%20Item%20Info%20Injector.user.js?version=1951553
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/treyharris/WaniKani-Pitch-Info/userscripts-safari/WaniKani%20Pitch%20Info.user.js
 // @updateURL    https://raw.githubusercontent.com/treyharris/WaniKani-Pitch-Info/userscripts-safari/WaniKani%20Pitch%20Info.user.js
@@ -139,9 +139,9 @@
 
         // Only display pitch next to the question if the user enables it in the settings.
         if (wkof.settings.wanikani_pitch_info?.display_pitch_beside_question) {
-          // Make sure that this is a vocab reading review
-          if (!(wkItemInfo.currentState.on == 'review' && wkItemInfo.currentState.type == 'vocabulary' && wkItemInfo.currentState.under.includes('reading'))) {
-            console.debug('Not vocab reading review. Ignoring.');
+          // Make sure that this is a vocab reading question on a supported quiz page
+          if (!(['review', 'extraStudy'].includes(wkItemInfo.currentState.on) && wkItemInfo.currentState.type == 'vocabulary' && wkItemInfo.currentState.under.includes('reading'))) {
+            console.debug('Not a vocab reading question on a supported quiz page. Ignoring.');
             return;
           }
 
