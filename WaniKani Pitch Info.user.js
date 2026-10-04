@@ -140,7 +140,7 @@
         // Only display pitch next to the question if the user enables it in the settings.
         if (wkof.settings.wanikani_pitch_info?.display_pitch_beside_question) {
           // Make sure that this is a vocab reading question on a supported quiz page
-          if (!(['review', 'extraStudy'].includes(wkItemInfo.currentState.on) && wkItemInfo.currentState.type == 'vocabulary' && wkItemInfo.currentState.under.includes('reading'))) {
+          if (!(['review', 'extraStudy', 'lessonQuiz'].includes(wkItemInfo.currentState.on) && wkItemInfo.currentState.type == 'vocabulary' && wkItemInfo.currentState.under.includes('reading'))) {
             console.debug('Not a vocab reading question on a supported quiz page. Ignoring.');
             return;
           }
