@@ -9,7 +9,7 @@
 // @supportURL   http://invertex.xyz
 // @run-at       document-idle
 // @inject-into  page
-// @require      https://greasyfork.org/scripts/430565-wanikani-item-info-injector/code/WaniKani%20Item%20Info%20Injector.user.js?version=1951553
+// @require      https://greasyfork.org/scripts/430565-wanikani-item-info-injector/code/WaniKani%20Item%20Info%20Injector.user.js?version=1989886
 // @grant        none
 // @downloadURL  https://raw.githubusercontent.com/treyharris/WaniKani-Pitch-Info/userscripts-safari/WaniKani%20Pitch%20Info.user.js
 // @updateURL    https://raw.githubusercontent.com/treyharris/WaniKani-Pitch-Info/userscripts-safari/WaniKani%20Pitch%20Info.user.js
